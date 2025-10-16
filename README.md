@@ -1,4 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+This is a [Next.js](https://nextjs.org) project featuring a **BusRoutePlanner** component - an interactive single-page application for planning bus routes with map visualization.
+
+## Features
+
+- **Interactive Map**: Leaflet-powered map centered on Mumbai (19.07, 72.87)
+- **Stop Management**: Add/remove bus stops with random nearby coordinates
+- **Route Planning**: Simple greedy heuristic algorithm to find shortest path
+- **Visual Route**: Red polyline showing the calculated route on the map
+- **Responsive Design**: Split-panel layout with TailwindCSS styling
 
 ## Getting Started
 
