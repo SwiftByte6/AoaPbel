@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Create custom icons for start and end points
+// Create custom icons for start and numbered points
 const createCustomIcon = (gradient, text, size = 32) => {
   return L.divIcon({
     className: 'custom-div-icon',
@@ -36,11 +36,10 @@ const createCustomIcon = (gradient, text, size = 32) => {
   });
 };
 
-const startIcon = createCustomIcon('linear-gradient(135deg, #10b981 0%, #059669 100%)', 'S', 36); // Green for Start
-const endIcon = createCustomIcon('linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 'E', 36);   // Red for End
-const routeIcon = createCustomIcon('linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', '', 32);  // Blue for route stops
+const startGradient = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'; // Green for Start
+const routeGradient = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // Blue for route stops
 
-export default function MapComponent({ stops, route, showComparison, originalRoute }) {
+export default function MapComponent({ stops, route, showComparison, originalRoute, schoolId }) {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -93,12 +92,8 @@ export default function MapComponent({ stops, route, showComparison, originalRou
               <span className="text-slate-600 font-medium">Start Point</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold">E</div>
-              <span className="text-slate-600 font-medium">End Point</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold">#</div>
-              <span className="text-slate-600 font-medium">Route Stops</span>
+              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold">1..N</div>
+              <span className="text-slate-600 font-medium">Route Stop Numbers</span>
             </div>
           </div>
         </div>
@@ -119,24 +114,26 @@ export default function MapComponent({ stops, route, showComparison, originalRou
         {stops.map((stop, index) => {
           // Find the position of this stop in the route
           const routeIndex = route.findIndex(routeStop => routeStop.id === stop.id);
-          const isStartPoint = routeIndex === 0;
+          const isSchool = stop.id === schoolId;
+          const isStartPoint = routeIndex === 0; // start of computed route
           const isEndPoint = routeIndex === route.length - 2; // -2 because last item is return to start
           const isInRoute = routeIndex !== -1;
           
-          // Determine which icon to use
+          // Determine which icon to use with dynamic labels
           let iconToUse = L.Icon.Default.prototype;
-          let markerText = index + 1;
-          
           if (isInRoute && route.length > 1) {
             if (isStartPoint) {
-              iconToUse = startIcon;
-              markerText = 'S';
-            } else if (isEndPoint) {
-              iconToUse = endIcon;
-              markerText = 'E';
+              iconToUse = createCustomIcon(startGradient, 'S', 36);
             } else {
-              iconToUse = routeIcon;
-              markerText = routeIndex;
+              // Label all non-start stops with their order number (including last stop before return)
+              iconToUse = createCustomIcon(routeGradient, String(routeIndex), 32);
+            }
+          } else {
+            // If route not computed yet, show school as S and others numbered by added order
+            if (isSchool) {
+              iconToUse = createCustomIcon(startGradient, 'S', 36);
+            } else {
+              iconToUse = createCustomIcon(routeGradient, String(index + 1), 32);
             }
           }
           
@@ -148,12 +145,11 @@ export default function MapComponent({ stops, route, showComparison, originalRou
                     <div className="font-bold text-slate-800 mb-2 text-sm">
                       {isInRoute && route.length > 1 ? (
                         <>
-                          {isStartPoint && <span className="text-emerald-600 flex items-center justify-center gap-1">🚀 START POINT</span>}
-                          {isEndPoint && <span className="text-red-600 flex items-center justify-center gap-1">🏁 END POINT</span>}
-                          {!isStartPoint && !isEndPoint && `Stop ${routeIndex}`}
+                          {isStartPoint && <span className="text-emerald-600 flex items-center justify-center gap-1">🚀 SCHOOL (START/END)</span>}
+                          {!isStartPoint && `Stop ${routeIndex}`}
                         </>
                       ) : (
-                        `Stop ${index + 1}`
+                        isSchool ? 'SCHOOL (START/END)' : `Stop ${index + 1}`
                       )}
                     </div>
                     <div className="text-slate-700 font-medium mb-2">{stop.name}</div>

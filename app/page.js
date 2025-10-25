@@ -17,6 +17,7 @@ export default function BusRoutePlanner() {
   const [showComparison, setShowComparison] = useState(false);
   const [originalRoute, setOriginalRoute] = useState([]);
   const [originalDistance, setOriginalDistance] = useState(0);
+  const [schoolId, setSchoolId] = useState(null);
 
   // Generate random coordinates around Mumbai
   const generateRandomCoordinates = () => {
@@ -39,17 +40,26 @@ export default function BusRoutePlanner() {
         ...coordinates
       };
       setStops([...stops, newStop]);
+      // If no school designated yet, set the first added stop as school by default
+      if (schoolId === null) {
+        setSchoolId(newStop.id);
+      }
       setNewStopName('');
     }
   };
 
   const removeStop = (id) => {
-    setStops(stops.filter(stop => stop.id !== id));
+    const remaining = stops.filter(stop => stop.id !== id);
+    setStops(remaining);
     setRoute([]);
     setTotalDistance(0);
     setShowComparison(false);
     setOriginalRoute([]);
     setOriginalDistance(0);
+    // If the removed stop was the school, reassign school to first remaining (if any)
+    if (id === schoolId) {
+      setSchoolId(remaining.length > 0 ? remaining[0].id : null);
+    }
   };
 
   // Calculate distance between two points using Haversine formula
@@ -67,62 +77,54 @@ export default function BusRoutePlanner() {
 
   const findShortestPath = () => {
     if (stops.length < 2) {
-      alert('Please add at least 2 stops to find a route');
+      alert('Please add at least 2 stops (including school) to find a route');
       return;
     }
-    
-    // Nearest Neighbor Algorithm for TSP
-    const unvisited = [...stops];
-    const path = [];
-    
-    // Start with the first stop
-    let currentStop = unvisited.shift();
-    path.push(currentStop);
-    
-    // Visit nearest unvisited stop each time
+
+    // Determine school (source) stop
+    const schoolStop = stops.find(s => s.id === schoolId) || stops[0];
+
+    // Nearest Neighbor Algorithm for TSP starting from school
+    const unvisited = stops.filter(s => s.id !== schoolStop.id);
+    const path = [schoolStop];
+
+    // Start at school, visit nearest unvisited each time
+    let currentStop = schoolStop;
     while (unvisited.length > 0) {
-      let nearestStop = unvisited[0];
-      let shortestDistance = calculateDistance(currentStop, nearestStop);
       let nearestIndex = 0;
-      
-      // Find the nearest unvisited stop
+      let shortestDistance = calculateDistance(currentStop, unvisited[0]);
       for (let i = 1; i < unvisited.length; i++) {
         const distance = calculateDistance(currentStop, unvisited[i]);
         if (distance < shortestDistance) {
           shortestDistance = distance;
-          nearestStop = unvisited[i];
           nearestIndex = i;
         }
       }
-      
-      // Move to nearest stop
       currentStop = unvisited.splice(nearestIndex, 1)[0];
       path.push(currentStop);
     }
-    
-    // Return to start
-    path.push(path[0]);
-    
+
+    // Return to school
+    path.push(schoolStop);
+
     // Calculate total distance
     let totalDist = 0;
     for (let i = 0; i < path.length - 1; i++) {
       totalDist += calculateDistance(path[i], path[i + 1]);
     }
-    
+
     setRoute(path);
     setTotalDistance(totalDist);
-    
-    // Also calculate original order distance for comparison
-    const originalPath = [...stops];
-    if (originalPath.length > 0) {
-      originalPath.push(originalPath[0]);
-    }
-    
+
+    // Original order path for comparison (start and end at school)
+    const othersInOrder = stops.filter(s => s.id !== schoolStop.id);
+    const originalPath = [schoolStop, ...othersInOrder, schoolStop];
+
     let originalDist = 0;
     for (let i = 0; i < originalPath.length - 1; i++) {
       originalDist += calculateDistance(originalPath[i], originalPath[i + 1]);
     }
-    
+
     setOriginalRoute(originalPath);
     setOriginalDistance(originalDist);
   };
@@ -201,24 +203,41 @@ export default function BusRoutePlanner() {
                       className="group flex items-center justify-between bg-white/70 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-200/50 hover:shadow-md hover:border-slate-300/50 transition-all duration-200"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
-                          {index + 1}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${stop.id === schoolId ? 'bg-gradient-to-br from-emerald-500 to-green-600 text-white' : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'}`}>
+                          {stop.id === schoolId ? 'S' : index + 1}
                         </div>
                         <div>
-                          <span className="text-slate-800 font-medium">{stop.name}</span>
+                          <span className="text-slate-800 font-medium flex items-center gap-2">
+                            {stop.name}
+                            {stop.id === schoolId && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">School</span>
+                            )}
+                          </span>
                           <div className="text-xs text-slate-500">
                             {stop.lat.toFixed(4)}, {stop.lng.toFixed(4)}
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => removeStop(stop.id)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {stop.id !== schoolId && (
+                          <button
+                            onClick={() => setSchoolId(stop.id)}
+                            className="opacity-0 group-hover:opacity-100 px-2 py-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-medium transition-all duration-200"
+                            title="Set as School"
+                          >
+                            Set School
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeStop(stop.id)}
+                          className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                          title="Remove Stop"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -351,6 +370,7 @@ export default function BusRoutePlanner() {
           route={route} 
           showComparison={showComparison}
           originalRoute={originalRoute}
+          schoolId={schoolId}
         />
       </div>
     </div>
